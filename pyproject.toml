@@ -3,6 +3,8 @@ name = "flowcli"
 version = "0.2.0"
 description = "Static call-graph mapper for Python codebases"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11,<4.0"
 dependencies = []
 

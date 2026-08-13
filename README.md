@@ -6,6 +6,7 @@
 [![Ruff](https://img.shields.io/badge/Ruff-linted-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
 [![mypy](https://img.shields.io/badge/mypy-checked-1F5082)](https://mypy-lang.org/)
 [![pytest](https://img.shields.io/badge/pytest-suite-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 A static call-graph mapper for Python codebases. You point it at a directory or a single file, and
 every `.py` below it is parsed through `ast`, callers are matched to callees, and three artifacts
@@ -387,3 +388,7 @@ These are deliberate. Guessing here would produce edges that look authoritative 
   subclasses. That is dynamic dispatch, and it is flagged `not-found-in-hierarchy` instead of being
   guessed.
 - The HTML layout is O(n²) per frame. A warning is printed above 3000 nodes.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
