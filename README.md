@@ -5,6 +5,7 @@
 [![uv](https://img.shields.io/badge/uv-managed-DE5FE9?logo=uv&logoColor=white)](https://docs.astral.sh/uv/)
 [![Ruff](https://img.shields.io/badge/Ruff-linted-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
 [![mypy](https://img.shields.io/badge/mypy-checked-1F5082)](https://mypy-lang.org/)
+![H](https://img.shields.io/badge/H-EC1313?style=flat-square)![o](https://img.shields.io/badge/o-EC8013?style=flat-square)![t](https://img.shields.io/badge/t-ECEC13?style=flat-square)![e](https://img.shields.io/badge/e-80EC13?style=flat-square)![l](https://img.shields.io/badge/l-13EC13?style=flat-square) ![T](https://img.shields.io/badge/T-13EC80?style=flat-square)![r](https://img.shields.io/badge/r-13ECEC?style=flat-square)![i](https://img.shields.io/badge/i-1380EC?style=flat-square)![v](https://img.shields.io/badge/v-1313EC?style=flat-square)![a](https://img.shields.io/badge/a-8013EC?style=flat-square)![g](https://img.shields.io/badge/g-EC13EC?style=flat-square)![o](https://img.shields.io/badge/o-EC1380?style=flat-square)
 [![pytest](https://img.shields.io/badge/pytest-suite-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
