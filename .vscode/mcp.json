@@ -1,0 +1,30 @@
+{
+  "inputs": [
+    {
+      "id": "github_pat",
+      "type": "promptString",
+      "description": "GitHub personal access token (repo scope)",
+      "password": true
+    }
+  ],
+  "servers": {
+    "github": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "-e",
+        "GITHUB_TOOLSETS",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${input:github_pat}",
+        "GITHUB_TOOLSETS": "repos,issues,pull_requests,context"
+      }
+    }
+  }
+}
