@@ -114,6 +114,26 @@ Anything that cannot be resolved is kept, along with a reason.
 
 4. Open `MODEL/graph.html` in a browser. No server and no network access are required.
 
+## Install On Your PATH
+
+The steps above run the tool from inside its own checkout. To call `flowcli` from any directory,
+install it as a uv tool instead:
+
+```bash
+uv tool install --editable ~/projects/flowcli
+```
+
+A `flowcli` executable is placed on your PATH, so the `uv run` prefix is no longer needed:
+
+```bash
+flowcli src/mypkg cli.py:main
+```
+
+We install it editable on purpose, so the command always reflects the checkout. Pull or edit the
+source and the installed executable picks the change up, with no reinstall. If `flowcli` is not
+found afterwards, run `uv tool update-shell` once and open a new shell. To remove it later, run
+`uv tool uninstall flowcli`.
+
 ## Usage
 
 You give two things: what to map, and where to start.
