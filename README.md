@@ -13,6 +13,18 @@ A static call-graph mapper for Python codebases. You point it at a directory or 
 every `.py` below it is parsed through `ast`, callers are matched to callees, and three artifacts
 are written: a machine-readable report, a Markdown report, and a self-contained interactive
 force-directed graph.
+<br><br>Collapsed view of nodes :<br><br>
+<img width="1059" height="530" alt="image" src="https://github.com/user-attachments/assets/03cb0fa2-b31e-450c-9425-da8458e21847" />
+
+<br><br>Last 5 calls with simulated debugger:<br><br>
+<img width="753" height="571" alt="image" src="https://github.com/user-attachments/assets/24e64991-84c5-4859-aa97-544cd8867e08" />
+
+<br><br>Top down view:<br><br>
+<img width="904" height="748" alt="image" src="https://github.com/user-attachments/assets/8dc111d7-4524-4f31-88bd-3e7cbd0938eb" />
+
+<br><br>Class with inner class:<br><br>
+<img width="417" height="466" alt="image" src="https://github.com/user-attachments/assets/f17ed80b-bed7-4236-ae77-8e6983cb6291" />
+<br><br>
 
 We ship v1 as static analysis only, with zero runtime dependencies and pure standard library. The
 data model reserves a `dynamic` slot on every node, which the v2 profiler merge fills with cProfile
