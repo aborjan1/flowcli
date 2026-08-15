@@ -47,6 +47,12 @@ strict_equality = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 
+# Fixture projects under tests/fixtures are sample code for the parser to chew on,
+# deliberately outside the type-checked surface. Tests import them at runtime via sys.path.
+[[tool.mypy.overrides]]
+module = ["traceproj", "traceproj.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 norecursedirs = ["fixtures", ".*", "build", "dist"]

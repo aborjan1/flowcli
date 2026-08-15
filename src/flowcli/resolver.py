@@ -83,9 +83,7 @@ def _resolve_one(index: ProjectIndex, mod: ModuleInfo, fn: FunctionInfo, call: R
         if fn.class_qualname is None:
             return _unresolved(call.repr_hint, "instance-attr")
         method = call.parts[-1]
-        target = resolve_method(
-            index, mod.name, fn.class_qualname, method, skip_self=call.kind is CallKind.SUPER_ATTR
-        )
+        target = resolve_method(index, mod.name, fn.class_qualname, method, skip_self=call.kind is CallKind.SUPER_ATTR)
         if target:
             return _internal(target)
         return _unresolved(call.repr_hint, "not-found-in-hierarchy")
@@ -99,7 +97,9 @@ def _resolve_one(index: ProjectIndex, mod: ModuleInfo, fn: FunctionInfo, call: R
     return _unresolved(call.repr_hint, "opaque")
 
 
-def _resolve_self_attr_chain(index: ProjectIndex, mod: ModuleInfo, class_qualname: str, call: RawCall) -> Outcome | None:
+def _resolve_self_attr_chain(
+    index: ProjectIndex, mod: ModuleInfo, class_qualname: str, call: RawCall
+) -> Outcome | None:
     """self.db.update() where the enclosing class (or a parsed base) types `db` as a parsed class."""
     attr, method = call.parts[1], call.parts[2]
     found = _find_attr_type(index, mod.name, class_qualname, attr)

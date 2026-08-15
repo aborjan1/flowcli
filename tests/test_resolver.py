@@ -89,14 +89,7 @@ def test_constructor_assignment_type_inference(sample_index: ProjectIndex) -> No
 
 
 def test_annotated_param_dispatch() -> None:
-    src = (
-        "class Svc:\n"
-        "    def run(self):\n"
-        "        return 1\n"
-        "\n"
-        "def use(svc: Svc):\n"
-        "    return svc.run()\n"
-    )
+    src = "class Svc:\n    def run(self):\n        return 1\n\ndef use(svc: Svc):\n    return svc.run()\n"
     m = parse_source("m", "m.py", src)
     index = mini_index(m)
     assert internal_targets(index, "m:use") == {"m:Svc.run"}
@@ -239,6 +232,4 @@ def test_hierarchy_cycle_guard() -> None:
 
 def test_cross_module_base_method(sample_index: ProjectIndex) -> None:
     # Engine (models) inherits from Base (same module) — resolve through resolve_method directly
-    assert (
-        resolve_method(sample_index, "sampleproj.models", "Engine", "stop") == "sampleproj.models:Base.stop"
-    )
+    assert resolve_method(sample_index, "sampleproj.models", "Engine", "stop") == "sampleproj.models:Base.stop"

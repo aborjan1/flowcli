@@ -78,9 +78,7 @@ def _classes_section(class_graph: ClassGraph | None) -> list[str]:
     lines = ["", "## Classes", "", "| Class | Kind | Inherits | Properties | Holds |", "|---|---|---|---|---|"]
     for nid in sorted(class_graph.nodes):
         node = class_graph.nodes[nid]
-        props = ", ".join(
-            f"{f['name']}: {f['type']}" if f["type"] else f["name"] for f in node.fields[:6]
-        ) or "—"
+        props = ", ".join(f"{f['name']}: {f['type']}" if f["type"] else f["name"] for f in node.fields[:6]) or "—"
         if len(node.fields) > 6:
             props += f", … +{len(node.fields) - 6}"
         lines.append(
@@ -91,9 +89,7 @@ def _classes_section(class_graph: ClassGraph | None) -> list[str]:
 
 
 def _most_called_section(graph: Graph) -> list[str]:
-    most_called = sorted(
-        (n for n in graph.nodes.values() if n.called_by), key=lambda n: (-len(n.called_by), n.id)
-    )[:10]
+    most_called = sorted((n for n in graph.nodes.values() if n.called_by), key=lambda n: (-len(n.called_by), n.id))[:10]
     if not most_called:
         return []
     lines = ["", "## Top 10 most-called", "", "| Node | In | Called by |", "|---|---:|---|"]

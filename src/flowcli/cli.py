@@ -132,8 +132,10 @@ def _cmd_map(args: argparse.Namespace) -> int:
 
     formats = {f.strip() for f in args.formats.split(",") if f.strip()}
     if not formats or formats - VALID_FORMATS:
-        print(f"flowcli: error: unknown format(s): {', '.join(sorted(formats - VALID_FORMATS)) or '(none)'}",
-              file=sys.stderr)
+        print(
+            f"flowcli: error: unknown format(s): {', '.join(sorted(formats - VALID_FORMATS)) or '(none)'}",
+            file=sys.stderr,
+        )
         return 1
 
     files = discover(root, args.exclude)
@@ -185,9 +187,16 @@ def _cmd_map(args: argparse.Namespace) -> int:
             return 1
 
     meta = _build_meta(graph, index, root, entry_label, unreachable, args.include_external, failures)
-    meta.update({"scoped": scoped, "depth_limit": args.depth, "entry_nodes": entry_ids,
-                 "simulated": not args.no_simulate, "has_runtime": runtime_data is not None,
-                 "entry_points": [s for s in suggestions if not scoped or s["id"] in graph.nodes]})
+    meta.update(
+        {
+            "scoped": scoped,
+            "depth_limit": args.depth,
+            "entry_nodes": entry_ids,
+            "simulated": not args.no_simulate,
+            "has_runtime": runtime_data is not None,
+            "entry_points": [s for s in suggestions if not scoped or s["id"] in graph.nodes],
+        }
+    )
     if runtime_data is not None:
         meta["runtime_file"] = str(args.runtime)
         meta["runtime_total"] = len(runtime_data.get("functions", {}))
