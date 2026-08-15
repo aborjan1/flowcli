@@ -34,6 +34,7 @@ from flowcli.graph import (
     compute_depths,
     parse_entry_specs,
     prune_unreachable,
+    split_entry_spec,
 )
 from flowcli.models import ModuleInfo, ParseFailure
 from flowcli.parser import parse_module
@@ -107,9 +108,7 @@ def _add_run_parser(sub: argparse._SubParsersAction) -> None:
 
 def _resolve_entry(entry: str, root: Path) -> str:
     """Entry may be given relative to the mapped path — accept both forms."""
-    head, sep, qual = entry.rpartition(":")
-    if not sep or (len(head) == 1 and entry[1:2] == ":"):  # no qualname (or a windows drive letter)
-        head, qual = entry, ""
+    head, qual = split_entry_spec(entry)
     candidate = Path(head)
     if not candidate.exists():
         nested = root / head
