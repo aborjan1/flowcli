@@ -49,8 +49,29 @@ def _is_project_root(path: Path) -> bool:
     return path.name == "src" or any((path / marker).is_file() for marker in PROJECT_MARKERS)
 
 
+def _holds_modules(path: Path) -> bool:
+    """True when the directory has .py files of its own — a plausible import-path component."""
+    try:
+        return any(entry.name.endswith(".py") and entry.is_file() for entry in path.iterdir())
+    except OSError:
+        return False
+
+
 def _namespace_prefix(start: Path) -> tuple[Path, str]:
-    """Same idea as the __init__.py walk, for trees that simply don't use __init__.py."""
+    """Same idea as the __init__.py walk, for trees that simply don't use __init__.py.
+
+    The __init__.py walk gets a positive signal at every step: each directory
+    proves it is a package. This walk has none, so it needs its own test for
+    whether a directory is really part of an import path.
+
+    A directory that holds modules of its own clearly is. One that holds only
+    other directories is only an import path when it sits directly at the
+    project root — that is where an empty namespace-package root lives
+    (`nspkg/inner/mod.py`). Deeper down, a module-less directory is
+    organisation, not packaging (`tests/fixtures/`), so the walk stops below it
+    and the start directory becomes its own root. That is what a folder of loose
+    scripts importing each other by bare name (`from b import go`) needs.
+    """
     probe = start
     namespace: list[str] = []
     for _ in range(_MAX_NAMESPACE_WALK):
@@ -60,6 +81,8 @@ def _namespace_prefix(start: Path) -> tuple[Path, str]:
         namespace.insert(0, probe.name)
         if _is_project_root(parent):
             return parent, ".".join(namespace)
+        if not _holds_modules(parent) and not _is_project_root(parent.parent):
+            break
         probe = parent
     return start, ""
 
