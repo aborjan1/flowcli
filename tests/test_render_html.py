@@ -89,11 +89,34 @@ def test_template_v2_markers(sample_graph: Graph, tmp_path: Path) -> None:
     out = tmp_path / "graph.html"
     render_html(sample_graph, {}, out)
     html = out.read_text(encoding="utf-8")
-    for marker in ("fmarch", "prefers-reduced-motion", "enterFocus", "layoutLayers", "legend-restore",
-                   "measureHeader", "Top-down", "recomputeFocus", "st-play", "applyStep", "roundRect",
-                   "drawEdge", "Entry points", "topbar", "rebuildTrail", "TRAIL_ALPHA", "st-hist",
-                   "prettyId", "drawClass", "measureClass", "vtab", "clickClassRow",
-                   "buildClassTree", "renderClassPanel", "data-ckey", "clipText"):
+    for marker in (
+        "fmarch",
+        "prefers-reduced-motion",
+        "enterFocus",
+        "layoutLayers",
+        "legend-restore",
+        "measureHeader",
+        "Top-down",
+        "recomputeFocus",
+        "st-play",
+        "applyStep",
+        "roundRect",
+        "drawEdge",
+        "Entry points",
+        "topbar",
+        "rebuildTrail",
+        "TRAIL_ALPHA",
+        "st-hist",
+        "prettyId",
+        "drawClass",
+        "measureClass",
+        "vtab",
+        "clickClassRow",
+        "buildClassTree",
+        "renderClassPanel",
+        "data-ckey",
+        "clipText",
+    ):
         assert marker in html, marker
 
 
@@ -130,14 +153,14 @@ def test_palette_is_fixed_not_generated(sample_graph: Graph, tmp_path: Path) -> 
 
 
 def test_entry_points_reach_payload(sample_graph: Graph) -> None:
-    meta = {"entry_points": [
-        {"id": "sampleproj.app:main", "kind": "main", "why": "named main()"},
-        {"id": "gone:x", "kind": "root", "why": "pruned"},
-    ]}
+    meta = {
+        "entry_points": [
+            {"id": "sampleproj.app:main", "kind": "main", "why": "named main()"},
+            {"id": "gone:x", "kind": "root", "why": "pruned"},
+        ]
+    }
     payload = build_payload(sample_graph, meta)
-    assert payload["meta"]["entry_points"] == [
-        {"id": "sampleproj.app:main", "kind": "main", "why": "named main()"}
-    ]
+    assert payload["meta"]["entry_points"] == [{"id": "sampleproj.app:main", "kind": "main", "why": "named main()"}]
 
 
 def test_payload_carries_simulation(sample_index, tmp_path: Path) -> None:

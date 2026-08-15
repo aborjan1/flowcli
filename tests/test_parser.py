@@ -147,12 +147,7 @@ def test_duplicate_method_last_definition_wins() -> None:
 
 
 def test_local_types_collected() -> None:
-    src = (
-        "def f(gen: Generator, n: int, opt: Engine | None):\n"
-        "    x = Engine()\n"
-        "    y: Base = make()\n"
-        "    z = plain\n"
-    )
+    src = "def f(gen: Generator, n: int, opt: Engine | None):\n    x = Engine()\n    y: Base = make()\n    z = plain\n"
     info = parse(src)
     assert info.functions["f"].local_types == {
         "gen": ("Generator",),
@@ -181,14 +176,7 @@ def test_self_attr_types_collected() -> None:
 
 
 def test_flow_extraction_if_loop_return() -> None:
-    src = (
-        "def f(x):\n"
-        "    if x > 0:\n"
-        "        return 1\n"
-        "    for i in range(x):\n"
-        "        g(i)\n"
-        "    return 2\n"
-    )
+    src = "def f(x):\n    if x > 0:\n        return 1\n    for i in range(x):\n        g(i)\n    return 2\n"
     info = parse(src)
     flow = info.functions["f"].flow
     assert [it["t"] for it in flow] == ["if", "loop", "ret"]

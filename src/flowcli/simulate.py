@@ -16,14 +16,19 @@ from __future__ import annotations
 from typing import Any
 
 from flowcli.models import MODULE_QUALNAME, CallKind, FunctionInfo, ModuleInfo, node_id
-from flowcli.resolver import INTERNAL, ProjectIndex, ResolvedCall, _resolve_class_ref
-from flowcli.resolver import _resolve_one as resolve_one
+from flowcli.resolver import INTERNAL, ProjectIndex, ResolvedCall, _resolve_class_ref, _resolve_one as resolve_one
 
 MAX_PASSES = 3
 MAX_VALUES = 4  # distinct literal values kept per parameter
 MAX_TYPES = 4
 MAX_EVENTS = 2000
 IMPLICIT_FIRST = ("self", "cls")
+
+
+def _param_names(fn: FunctionInfo) -> list[str]:
+    """Declared parameter names, in order. `params` types every value `str | None`,
+    but the parser always writes a string name — only `ann` and `default` are nullable."""
+    return [str(p["name"]) for p in fn.params]
 
 
 class _Site:
@@ -50,10 +55,8 @@ def simulate(
 
     records: dict[str, dict[str, Any]] = {}
     for nid, fn in fns.items():
-        params = {
-            p["name"]: {"types": [], "values": [], "from": []}
-            for p in fn.params
-            if p["name"] not in IMPLICIT_FIRST
+        params: dict[str, dict[str, Any]] = {
+            name: {"types": [], "values": [], "from": []} for name in _param_names(fn) if name not in IMPLICIT_FIRST
         }
         records[nid] = {"args": params, "returns": list(signatures.get(nid, {}).get("returns", [])), "sites": 0}
 
@@ -101,7 +104,7 @@ def _bind_site(rc: ResolvedCall, fns: dict[str, FunctionInfo]) -> _Site | None:
     callee = fns.get(rc.target)
     if callee is None or rc.call is None:
         return None
-    names = [p["name"] for p in callee.params]
+    names = _param_names(callee)
     if names and names[0] in IMPLICIT_FIRST:
         names = names[1:]  # bound method / constructor: receiver is implicit
     if rc.call.kind is CallKind.OPAQUE:

@@ -46,10 +46,17 @@ def test_path_plus_folder_entry(tmp_path: Path, sampleproj_path: Path) -> None:
 
 def test_multiple_entries_as_arguments(tmp_path: Path, sampleproj_path: Path) -> None:
     out = tmp_path / "out"
-    rc = main([
-        str(sampleproj_path), "app.py:main", "helpers.py:ping",
-        "-o", str(out), "--formats", "json",
-    ])
+    rc = main(
+        [
+            str(sampleproj_path),
+            "app.py:main",
+            "helpers.py:ping",
+            "-o",
+            str(out),
+            "--formats",
+            "json",
+        ]
+    )
     assert rc == 0
     data = json.loads((out / "report.json").read_text(encoding="utf-8"))
     assert data["meta"]["entry"].startswith("2 entries: ")
@@ -191,10 +198,19 @@ def test_map_module_entry_whole_file(tmp_path: Path, sampleproj_path: Path) -> N
 
 def test_map_entry_depth_limit(tmp_path: Path, sampleproj_path: Path) -> None:
     out = tmp_path / "out"
-    rc = main([
-        "map", str(sampleproj_path), "sampleproj.app:<module>", "-o", str(out),
-        "--depth", "1", "--formats", "json",
-    ])
+    rc = main(
+        [
+            "map",
+            str(sampleproj_path),
+            "sampleproj.app:<module>",
+            "-o",
+            str(out),
+            "--depth",
+            "1",
+            "--formats",
+            "json",
+        ]
+    )
     assert rc == 0
     data = json.loads((out / "report.json").read_text(encoding="utf-8"))
     assert data["meta"]["depth_limit"] == 1
@@ -204,10 +220,18 @@ def test_map_entry_depth_limit(tmp_path: Path, sampleproj_path: Path) -> None:
 
 def test_map_entry_keep_unreachable(tmp_path: Path, sampleproj_path: Path) -> None:
     out = tmp_path / "out"
-    rc = main([
-        "map", str(sampleproj_path), "sampleproj.app:main", "-o", str(out),
-        "--keep-unreachable", "--formats", "json",
-    ])
+    rc = main(
+        [
+            "map",
+            str(sampleproj_path),
+            "sampleproj.app:main",
+            "-o",
+            str(out),
+            "--keep-unreachable",
+            "--formats",
+            "json",
+        ]
+    )
     assert rc == 0
     data = json.loads((out / "report.json").read_text(encoding="utf-8"))
     assert data["meta"]["scoped"] is False

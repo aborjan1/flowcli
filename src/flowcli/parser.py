@@ -5,9 +5,11 @@ from __future__ import annotations
 import ast
 import tokenize
 from pathlib import Path
+from typing import Any
 
 from flowcli.models import (
     MODULE_QUALNAME,
+    ArgAtom,
     CallKind,
     ClassInfo,
     FunctionInfo,

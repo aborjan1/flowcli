@@ -4,13 +4,13 @@ from pathlib import Path
 
 from flowcli.discovery import discover, find_package_prefix
 from flowcli.entrypoints import detect
-from flowcli.models import ParseFailure
+from flowcli.models import ModuleInfo, ParseFailure
 from flowcli.parser import parse_module
 from flowcli.resolver import ProjectIndex, resolve_all
 
 
 def index_of(root: Path) -> ProjectIndex:
-    modules = {}
+    modules: dict[str, ModuleInfo] = {}
     for name, path in discover(root):
         info = parse_module(name, path)
         assert not isinstance(info, ParseFailure), info
@@ -67,9 +67,7 @@ def test_main_guard_module_is_a_script_entry(tmp_path: Path) -> None:
     pkg = tmp_path / "guarded"
     pkg.mkdir()
     (pkg / "__init__.py").write_text("", encoding="utf-8")
-    (pkg / "tool.py").write_text(
-        "def run():\n    pass\n\nif __name__ == '__main__':\n    run()\n", encoding="utf-8"
-    )
+    (pkg / "tool.py").write_text("def run():\n    pass\n\nif __name__ == '__main__':\n    run()\n", encoding="utf-8")
     found = {s["id"]: s for s in suggestions(pkg)}
     assert found["guarded.tool:<module>"]["kind"] == "script"
     assert "__main__ guard" in found["guarded.tool:<module>"]["why"]

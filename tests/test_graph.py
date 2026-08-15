@@ -85,9 +85,9 @@ def test_multiple_entries_merge(sample_index: ProjectIndex) -> None:
 def test_multiple_entries_mix_kinds(sample_index: ProjectIndex, sampleproj_path: Path) -> None:
     specs = [str(sampleproj_path / "sub"), "sampleproj.app:main", "sampleproj.helpers"]
     _label, ids = parse_entry_specs(specs, sample_index)
-    assert "sampleproj.sub.worker:work" in ids   # folder
-    assert "sampleproj.app:main" in ids          # single function
-    assert "sampleproj.helpers:fact" in ids      # whole module
+    assert "sampleproj.sub.worker:work" in ids  # folder
+    assert "sampleproj.app:main" in ids  # single function
+    assert "sampleproj.helpers:fact" in ids  # whole module
     assert ids == sorted(ids)
 
 

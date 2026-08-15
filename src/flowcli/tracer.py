@@ -122,7 +122,7 @@ def capture(root: Path, *, samples: bool = True) -> Iterator[RuntimeCapture]:
             cap.functions[nid] = rec
         rec["ncalls"] += 1
         locs = frame.f_locals
-        sample = {} if samples and len(rec["samples"]) < SAMPLE_LIMIT else None
+        sample: dict[str, str] | None = {} if samples and len(rec["samples"]) < SAMPLE_LIMIT else None
         for display, bare in _param_names(frame.f_code):
             if bare not in locs:
                 continue
