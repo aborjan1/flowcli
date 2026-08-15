@@ -219,6 +219,22 @@ def parse_entry_specs(specs: Sequence[str], index: ProjectIndex) -> tuple[str, l
     return f"{len(labels)} entries: {shown}", sorted(ids)
 
 
+def split_entry_spec(spec: str) -> tuple[str, str | None]:
+    """Split an entry spec into (module-or-path, qualname or None).
+
+    A leading Windows drive letter belongs to the path, not to a qualname:
+    `C:\\src\\app.py` is one path, `C:\\src\\app.py:main` is that path plus
+    `main`. A single-letter *module* is not a drive though — `a:run` must stay
+    module `a`, function `run` — so the drive test requires the separator that a
+    drive-rooted path always carries.
+    """
+    drive = 2 if len(spec) > 2 and spec[0].isalpha() and spec[1] == ":" and spec[2] in "\\/" else 0
+    head, sep, qual = spec[drive:].rpartition(":")
+    if not sep:
+        return spec, None
+    return spec[:drive] + head, qual
+
+
 def parse_entry_spec(spec: str, index: ProjectIndex) -> tuple[str, list[str]]:
     """Resolve an entry spec to (display label, seed node ids).
 
@@ -227,10 +243,7 @@ def parse_entry_spec(spec: str, index: ProjectIndex) -> tuple[str, list[str]]:
     'path/to/dir' / 'dotted.package' -> every function in every module beneath it,
     subpackages included — the whole folder's ecosystem.
     """
-    if ":" in spec:
-        mod_part, qual = spec.rsplit(":", 1)
-    else:
-        mod_part, qual = spec, None
+    mod_part, qual = split_entry_spec(spec)
 
     if qual is None:
         subtree = _find_subtree(mod_part, index)

@@ -11,6 +11,7 @@ from flowcli.graph import (
     parse_entry_spec,
     parse_entry_specs,
     prune_unreachable,
+    split_entry_spec,
 )
 from flowcli.models import ModuleInfo, ParseFailure
 from flowcli.parser import parse_source
@@ -113,6 +114,25 @@ def test_single_entry_keeps_plain_label(sample_index: ProjectIndex) -> None:
     label, ids = parse_entry_specs(["sampleproj.app:main"], sample_index)
     assert label == "sampleproj.app:main"
     assert ids == ["sampleproj.app:main"]
+
+
+@pytest.mark.parametrize(
+    ("spec", "expected"),
+    [
+        ("mod.py", ("mod.py", None)),
+        ("mod.py:main", ("mod.py", "main")),
+        ("pkg.mod", ("pkg.mod", None)),
+        ("pkg.mod:Cls.meth", ("pkg.mod", "Cls.meth")),
+        ("a:run", ("a", "run")),  # single-letter module, not a drive
+        ("relative/dir", ("relative/dir", None)),
+        (r"C:\src\app.py", (r"C:\src\app.py", None)),
+        (r"C:\src\app.py:main", (r"C:\src\app.py", "main")),
+        ("C:/src/app.py:main", ("C:/src/app.py", "main")),
+        (r"C:\src\sub", (r"C:\src\sub", None)),
+    ],
+)
+def test_split_entry_spec(spec: str, expected: tuple[str, str | None]) -> None:
+    assert split_entry_spec(spec) == expected
 
 
 def test_directory_entry_covers_whole_subtree(sample_index: ProjectIndex, sampleproj_path: Path) -> None:
