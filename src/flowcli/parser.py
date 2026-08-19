@@ -294,13 +294,9 @@ class _Collector(ast.NodeVisitor):
                     )
                 if parts:
                     self._record_self_attr(target.id, parts, lineno=node.lineno, source="class")
-            elif (
-                parts
-                and isinstance(target, ast.Attribute)
-                and isinstance(target.value, ast.Name)
-                and target.value.id == "self"
-            ):
-                self._record_self_attr(target.attr, parts, lineno=node.lineno)  # constructor -> instance attr
+            elif isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+                # every `self.x = ...` is a property; only a constructor call also gives it a type
+                self._record_self_attr(target.attr, parts, lineno=node.lineno)
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
