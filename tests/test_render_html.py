@@ -53,6 +53,16 @@ def test_explore_mode_controls_present(sample_graph: Graph, tmp_path: Path) -> N
     assert "__FLOWCLI_DATA__" not in html
 
 
+def test_boot_reveals_nothing(sample_graph: Graph, tmp_path: Path) -> None:
+    """entry_nodes is a scope, not an anchor — a directory entry seeds it with the whole package."""
+    out = tmp_path / "graph.html"
+    render_html(sample_graph, {}, out)
+    html = out.read_text(encoding="utf-8")
+    assert "data.meta.entry_nodes" not in html  # nothing is surfaced before the first click
+    assert "function ensureVisible" in html 
+    assert "function revealCallees" in html
+
+
 def test_payload_includes_flow(sample_graph: Graph) -> None:
     payload = build_payload(sample_graph, {})
     by_id = {n["id"]: n for n in payload["nodes"]}

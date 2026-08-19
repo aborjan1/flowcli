@@ -2129,10 +2129,6 @@ data.modules.forEach(function (name, m) {
 });
 scale = Math.min(1.2, (0.42 * Math.min(W, H)) / R0);
 tx = W / 2; ty = H / 2;
-((data.meta && data.meta.entry_nodes) || []).forEach(function (id) {
-  const i = idToIdx.get(id);
-  if (i !== undefined) { ensureVisible(i); revealCallees(i); }
-});
 rebuild();
 requestAnimationFrame(frame);
 </script>
