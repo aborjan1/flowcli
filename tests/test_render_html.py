@@ -59,7 +59,7 @@ def test_boot_reveals_nothing(sample_graph: Graph, tmp_path: Path) -> None:
     render_html(sample_graph, {}, out)
     html = out.read_text(encoding="utf-8")
     assert "data.meta.entry_nodes" not in html  # nothing is surfaced before the first click
-    assert "function ensureVisible" in html 
+    assert "function ensureVisible" in html
     assert "function revealCallees" in html
 
 

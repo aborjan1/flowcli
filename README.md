@@ -351,8 +351,9 @@ flowcli/
 └── pyproject.toml
 ```
 
-`MODEL/` is the default output directory and is ignored by Git, along with `.venv/`, caches and
-build artifacts.
+`MODEL/` is the default output directory. It is committed as a worked example — the report and
+graph you get from running flowcli on flowcli itself — so regenerating it shows up as a diff.
+`.venv/`, caches and build artifacts are ignored by Git.
 
 ## Modify The Tool
 
