@@ -33,6 +33,7 @@ def detect(index: ProjectIndex, called: set[str], root: Path | None = None) -> l
         if nid:
             add(nid, "script", 100, f"console script: {script}")
 
+    exported = _exported(index)
     for mod_name in sorted(index.modules):
         mod = index.modules[mod_name]
         if mod_name.endswith("__main__") and MODULE_QUALNAME in mod.functions:
@@ -50,9 +51,10 @@ def detect(index: ProjectIndex, called: set[str], root: Path | None = None) -> l
             bare = qual.rsplit(".", 1)[-1]
             if bare.startswith("_") or "." in qual and qual.split(".")[0] not in mod.classes:
                 continue
-            if bare in MAIN_NAMES and nid not in called:
-                add(nid, "main", 90, f"named {bare}() and never called internally")
-            elif nid in _exported(index) and nid not in called:
+            if bare in MAIN_NAMES and (nid not in called or mod.has_main_guard):
+                why = "run by the module's __main__ guard" if mod.has_main_guard else "never called internally"
+                add(nid, "main", 90, f"named {bare}() and {why}")
+            elif nid in exported:
                 add(nid, "public", 75, "exported from the package __init__")
             elif nid not in called and not _is_private_path(mod_name, qual):
                 add(nid, "root", 40 + min(len(fn.params), 5), "nothing in the package calls it")
