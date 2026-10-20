@@ -58,14 +58,15 @@ flowchart LR
 
 Two passes are performed, with no AST re-walks.
 
-**1. Parse** (`parser.py`). One visitor walk per file builds a `ModuleInfo`: functions and classes
+**1. Parse** (`analysis/parser.py`, `analysis/flow.py`). One visitor walk per file builds a `ModuleInfo`: functions and classes
 with qualified names, a module-wide import table with relative imports resolved to absolute dotted
 paths, and raw call records classified as `NAME`, `DOTTED`, `SELF_ATTR`, `CLS_ATTR`, `SUPER_ATTR` or
 `OPAQUE`. Each function also gets a nested control-flow tree (`flow` in `report.json`) covering
 statements, branches, loops, try/except and match, capped at 200 nodes per function. The resolver's
 per-line call targets are attached to flow nodes, so diagrams can link to callees.
 
-**2. Resolve** (`resolver.py`). Each raw call is resolved against the project-wide index in a fixed
+**2. Resolve** (`analysis/resolver.py`, over the symbol lookups in `analysis/index.py`). Each raw
+call is resolved against the project-wide index in a fixed
 order.
 
 ```mermaid
@@ -330,24 +331,39 @@ Further modes apply across the views.
 
 ## Project Layout
 
+The package is split into layers. Each layer imports only from the layers below it, and only their
+public names. `tests/test_architecture.py` enforces both rules.
+
 ```text
 flowcli/
 ├── src/flowcli/
-│   ├── discovery.py       # Walk a source tree, find the modules to parse
-│   ├── parser.py          # One AST visit per file, builds ModuleInfo + flow trees
-│   ├── resolver.py        # Match raw call records to definitions project-wide
-│   ├── infer.py           # Signature and return-type inference to a fixpoint
-│   ├── classes.py         # Class cards, properties, inheritance edges
-│   ├── entrypoints.py     # Detect console scripts, main(), exports, unreferenced funcs
-│   ├── simulate.py        # Propagate call-site arguments across the graph
-│   ├── tracer.py          # sys.setprofile runtime capture for flowcli run
-│   ├── graph.py           # Assemble nodes and edges, prune by depth
-│   ├── models.py          # Shared data model
-│   ├── report.py          # report.json and report.md writers
-│   ├── render_html.py     # Data injection into the standalone page
-│   ├── template_html.py   # The offline explorer itself
-│   └── cli.py             # Argument parsing and command wiring
-├── tests/                 # Unit tests, plus fixture projects under tests/fixtures
+│   ├── cli.py              # Argument parsing, messages, exit codes — nothing else
+│   ├── pipeline.py         # map_project(): discover → parse → resolve → graph → scope → write
+│   ├── analysis/           # Reading source code; imports nothing outside itself
+│   │   ├── model.py        #   Parse-stage data types (ModuleInfo, FunctionInfo, RawCall, ...)
+│   │   ├── discovery.py    #   Walk a source tree, derive dotted module names
+│   │   ├── parser.py       #   One AST visit per file, builds ModuleInfo
+│   │   ├── flow.py         #   Per-function control-flow trees
+│   │   ├── astutil.py      #   AST helpers shared by parser and flow
+│   │   ├── index.py        #   ProjectIndex: find classes, walk the MRO, type self.<attr>
+│   │   ├── resolver.py     #   Match raw call records to definitions project-wide
+│   │   ├── infer.py        #   Signature and return-type inference to a fixpoint
+│   │   ├── simulate.py     #   Propagate call-site arguments across the graph
+│   │   ├── classes.py      #   Class cards, properties, inheritance edges
+│   │   └── entrypoints.py  #   Detect console scripts, main(), exports, unreferenced funcs
+│   ├── graph/              # The call graph built from analysis results
+│   │   ├── model.py        #   Graph, Node, UnresolvedCall
+│   │   ├── build.py        #   Assemble nodes and edges; merge simulation and runtime data
+│   │   ├── scope.py        #   BFS depths from the entry, prune the unreachable
+│   │   └── entry.py        #   Resolve ENTRY specs (file, file:func, module, folder) to node ids
+│   ├── runtime/            # flowcli run
+│   │   ├── tracer.py       #   sys.setprofile runtime capture
+│   │   └── runner.py       #   Run a script / -m module under the tracer, build runtime.json
+│   └── output/             # Emitters
+│       ├── report.py       #   report.json, report.md, terminal summary
+│       ├── html.py         #   Data injection into the standalone page
+│       └── template.py     #   The offline explorer itself
+├── tests/                  # Unit tests, plus fixture projects under tests/fixtures
 └── pyproject.toml
 ```
 
@@ -360,15 +376,18 @@ graph you get from running flowcli on flowcli itself — so regenerating it show
 | What to change | Location |
 | --- | --- |
 | Command-line surface and flags | `src/flowcli/cli.py` |
-| What counts as a call, and flow-tree shape | `src/flowcli/parser.py` |
-| Call resolution rules and hierarchy walking | `src/flowcli/resolver.py` |
-| Type inference | `src/flowcli/infer.py` |
-| Argument propagation | `src/flowcli/simulate.py` |
-| Report contents | `src/flowcli/report.py` |
-| Explorer behaviour and rendering | `src/flowcli/template_html.py` |
+| Pipeline order and report metadata | `src/flowcli/pipeline.py` |
+| What counts as a call | `src/flowcli/analysis/parser.py` |
+| Flow-tree shape | `src/flowcli/analysis/flow.py` |
+| Call resolution rules | `src/flowcli/analysis/resolver.py` |
+| Class lookup and hierarchy walking | `src/flowcli/analysis/index.py` |
+| Type inference | `src/flowcli/analysis/infer.py` |
+| Argument propagation | `src/flowcli/analysis/simulate.py` |
+| Report contents | `src/flowcli/output/report.py` |
+| Explorer behaviour and rendering | `src/flowcli/output/template.py` |
 | Tests and fixture projects | `tests/` |
 
-To add a resolution rule, extend the ordered lookup in `resolver.py`, give the failure case a named
+To add a resolution rule, extend the ordered lookup in `analysis/resolver.py`, give the failure case a named
 reason rather than a silent drop, and add a fixture under `tests/fixtures/` that exercises it.
 
 ## Development
