@@ -16,17 +16,14 @@ from __future__ import annotations
 
 import argparse
 import json
-import runpy
 import sys
-import traceback
-from datetime import UTC, datetime
 from pathlib import Path
 
 from flowcli import __version__
 from flowcli.graph.entry import split_entry_spec
 from flowcli.output.report import print_summary
 from flowcli.pipeline import FORMATS, MapError, MapOptions, map_project, write_outputs
-from flowcli.tracer import capture
+from flowcli.runtime.runner import Program, execute, runtime_payload
 
 SUBCOMMANDS = {"map", "run"}
 
@@ -144,38 +141,21 @@ def _cmd_map(args: argparse.Namespace) -> int:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
-    prog = [p for p in args.prog if p != "--"] if args.prog and args.prog[0] == "--" else list(args.prog)
-    if not prog:
-        print("flowcli: error: no program given (script.py [args] or -- -m module [args])", file=sys.stderr)
-        return 1
-
-    if prog[0] == "-m":
-        if len(prog) < 2:
-            print("flowcli: error: -m requires a module name", file=sys.stderr)
-            return 1
-        mode, target, prog_args = "module", prog[1], prog[2:]
-        default_root = Path.cwd()
-    else:
-        mode, target, prog_args = "script", prog[0], prog[1:]
-        if not Path(target).is_file():
-            print(f"flowcli: error: script not found: {target}", file=sys.stderr)
-            return 1
-        default_root = Path(target).resolve().parent
-
-    root = Path(args.root).resolve() if args.root else default_root
+    try:
+        program = Program.parse(args.prog)
+    except ValueError as exc:
+        return _fail(str(exc))
+    root = Path(args.root).resolve() if args.root else program.home
     if not root.exists():
-        print(f"flowcli: error: root not found: {root}", file=sys.stderr)
-        return 1
+        return _fail(f"root not found: {root}")
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    cap, exit_code = _execute(mode, target, prog_args, root, default_root, samples=not args.no_samples)
+    samples = not args.no_samples
+    cap, exit_code = execute(program, root, samples=samples)
     runtime_path = out_dir / "runtime.json"
-    runtime_path.write_text(
-        json.dumps(_runtime_payload(cap, root, mode, target, prog_args, exit_code, not args.no_samples), indent=2)
-        + "\n",
-        encoding="utf-8",
-    )
+    payload = runtime_payload(cap, program, root, exit_code, samples)
+    runtime_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     if not args.quiet:
         print(f"flowcli: observed {len(cap.functions)} function(s), {cap.calls_total} call(s)")
         print(f"wrote runtime.json to {out_dir}")
@@ -188,58 +168,6 @@ def _cmd_run(args: argparse.Namespace) -> int:
         if rc:
             return rc
     return exit_code
-
-
-def _execute(mode: str, target: str, prog_args: list[str], root: Path, script_dir: Path, *, samples: bool):
-    exit_code = 0
-    old_argv = sys.argv[:]
-    added_path = str(script_dir if mode == "script" else Path.cwd())
-    sys.path.insert(0, added_path)
-    try:
-        with capture(root, samples=samples) as cap:
-            try:
-                sys.argv = [target, *prog_args]
-                if mode == "script":
-                    runpy.run_path(target, run_name="__main__")
-                else:
-                    runpy.run_module(target, run_name="__main__", alter_sys=True)
-            except SystemExit as exc:
-                exit_code = _exit_code_of(exc)
-            except BaseException:
-                traceback.print_exc()
-                exit_code = 1
-    finally:
-        sys.argv = old_argv
-        if added_path in sys.path:
-            sys.path.remove(added_path)
-    return cap, exit_code
-
-
-def _exit_code_of(exc: SystemExit) -> int:
-    code = exc.code
-    if code is None:
-        return 0
-    return code if isinstance(code, int) else 1
-
-
-def _runtime_payload(cap, root: Path, mode: str, target: str, prog_args: list[str], exit_code: int, samples: bool):
-    return {
-        "meta": {
-            "tool": "flowcli",
-            "version": __version__,
-            "schema_version": 1,
-            "root": str(root),
-            "argv": [target, *prog_args],
-            "mode": mode,
-            "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
-            "samples": samples,
-            "calls_total": cap.calls_total,
-            "events_truncated": cap.events_truncated,
-            "exit": exit_code,
-        },
-        "functions": cap.functions,
-        "events": cap.events,
-    }
 
 
 def _fail(message: str, code: int = 1, *, prefix: str = "error: ") -> int:
