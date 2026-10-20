@@ -34,8 +34,8 @@ from flowcli.graph.build import apply_runtime, apply_simulation, build_graph
 from flowcli.graph.entry import parse_entry_specs, split_entry_spec
 from flowcli.graph.model import Graph
 from flowcli.graph.scope import compute_depths, prune_unreachable
-from flowcli.render_html import render_html
-from flowcli.report import print_summary, write_json, write_markdown
+from flowcli.output.html import render_html
+from flowcli.output.report import print_summary, write_json, write_markdown
 from flowcli.tracer import capture
 
 VALID_FORMATS = {"json", "md", "html"}

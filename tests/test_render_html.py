@@ -7,7 +7,7 @@ from typing import Any
 
 from flowcli.graph.build import apply_runtime
 from flowcli.graph.model import Graph, Node
-from flowcli.render_html import build_payload, render_html
+from flowcli.output.html import build_payload, render_html
 
 DATA_RE = re.compile(r'<script id="flowcli-data" type="application/json">(.*?)</script>', re.S)
 

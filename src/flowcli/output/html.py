@@ -8,15 +8,17 @@ from pathlib import Path
 from typing import Any
 
 from flowcli.analysis.classes import ClassGraph
+from flowcli.analysis.model import split_node_id
 from flowcli.graph.model import Graph, Node
-from flowcli.template_html import TEMPLATE
+from flowcli.output.template import TEMPLATE
 
 EXTERNAL_MODULE = "(external)"
 LARGE_GRAPH_WARNING = 3000  # O(n^2) repulsion gets sluggish beyond this
 
 
-def _module_of(node_id: str) -> str:
-    return node_id.split(":", 1)[0] if ":" in node_id else EXTERNAL_MODULE
+def _module_of(nid: str) -> str:
+    module, qualname = split_node_id(nid)
+    return module if qualname else EXTERNAL_MODULE
 
 
 def _node_entry(n: Node, module_index: int) -> dict[str, Any]:

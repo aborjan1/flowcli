@@ -6,7 +6,7 @@ from typing import Any
 
 from flowcli.graph.model import Graph
 from flowcli.graph.scope import compute_depths
-from flowcli.report import write_json, write_markdown
+from flowcli.output.report import write_json, write_markdown
 
 
 def fixed_meta(graph: Graph, **overrides: Any) -> dict[str, Any]:
@@ -84,7 +84,7 @@ def test_md_signatures_section(sample_graph: Graph, tmp_path: Path) -> None:
 
 
 def test_summary_runtime_line(sample_graph: Graph, capsys) -> None:
-    from flowcli.report import print_summary
+    from flowcli.output.report import print_summary
 
     meta = fixed_meta(sample_graph, has_runtime=True, runtime_matched=3, runtime_total=5)
     print_summary(sample_graph, meta)

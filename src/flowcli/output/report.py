@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from flowcli.analysis.classes import ClassGraph
+from flowcli.analysis.model import split_node_id
 from flowcli.graph.model import Graph, Node
 
 
@@ -73,7 +74,7 @@ def _classes_section(class_graph: ClassGraph | None) -> list[str]:
     has_edges: dict[str, list[str]] = {}
     for edge in class_graph.edges:
         if edge.kind == "has":
-            has_edges.setdefault(edge.source, []).append(f"{edge.label} → {edge.target.split(':', 1)[1]}")
+            has_edges.setdefault(edge.source, []).append(f"{edge.label} → {split_node_id(edge.target)[1]}")
     lines = ["", "## Classes", "", "| Class | Kind | Inherits | Properties | Holds |", "|---|---|---|---|---|"]
     for nid in sorted(class_graph.nodes):
         node = class_graph.nodes[nid]
