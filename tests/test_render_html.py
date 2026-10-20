@@ -5,9 +5,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from flowcli.graph import Graph, apply_runtime
-from flowcli.models import Node
-from flowcli.render_html import build_payload, render_html
+from flowcli.graph.build import apply_runtime
+from flowcli.graph.model import Graph, Node
+from flowcli.output.html import build_payload, render_html
 
 DATA_RE = re.compile(r'<script id="flowcli-data" type="application/json">(.*?)</script>', re.S)
 
@@ -131,9 +131,9 @@ def test_template_v2_markers(sample_graph: Graph, tmp_path: Path) -> None:
 
 
 def test_class_payload_embedded(sample_index, tmp_path: Path) -> None:
-    from flowcli.classes import build_class_graph
-    from flowcli.graph import build_graph
-    from flowcli.resolver import resolve_all
+    from flowcli.analysis.classes import build_class_graph
+    from flowcli.analysis.resolver import resolve_all
+    from flowcli.graph.build import build_graph
 
     graph = build_graph(sample_index, resolve_all(sample_index))
     out = tmp_path / "graph.html"
@@ -174,8 +174,8 @@ def test_entry_points_reach_payload(sample_graph: Graph) -> None:
 
 
 def test_payload_carries_simulation(sample_index, tmp_path: Path) -> None:
-    from flowcli.graph import apply_simulation, build_graph
-    from flowcli.resolver import resolve_all
+    from flowcli.analysis.resolver import resolve_all
+    from flowcli.graph.build import apply_simulation, build_graph
 
     resolved = resolve_all(sample_index)
     graph = build_graph(sample_index, resolved)

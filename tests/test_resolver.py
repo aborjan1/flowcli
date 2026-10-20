@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from flowcli.models import ClassInfo, ModuleInfo, ParseFailure
-from flowcli.parser import parse_source
-from flowcli.resolver import EXTERNAL, INTERNAL, UNRESOLVED, ProjectIndex, resolve_all, resolve_method
+from flowcli.analysis.index import ProjectIndex
+from flowcli.analysis.model import ClassInfo, ModuleInfo, ParseFailure
+from flowcli.analysis.parser import parse_source
+from flowcli.analysis.resolver import EXTERNAL, INTERNAL, UNRESOLVED, resolve_all
 
 
 def internal_targets(index: ProjectIndex, caller: str) -> set[str]:
@@ -227,9 +228,9 @@ def test_hierarchy_cycle_guard() -> None:
     m.classes["A"] = ClassInfo(qualname="A", module="m", lineno=1, bases=[("B",)])
     m.classes["B"] = ClassInfo(qualname="B", module="m", lineno=2, bases=[("A",)])
     index = ProjectIndex({"m": m})
-    assert resolve_method(index, "m", "A", "nope") is None
+    assert index.resolve_method("m", "A", "nope") is None
 
 
 def test_cross_module_base_method(sample_index: ProjectIndex) -> None:
-    # Engine (models) inherits from Base (same module) — resolve through resolve_method directly
-    assert resolve_method(sample_index, "sampleproj.models", "Engine", "stop") == "sampleproj.models:Base.stop"
+    # Engine (models) inherits from Base (same module) — resolve through ProjectIndex.resolve_method directly
+    assert sample_index.resolve_method("sampleproj.models", "Engine", "stop") == "sampleproj.models:Base.stop"

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from flowcli.classes import build_class_graph, scope_class_graph
-from flowcli.models import ModuleInfo, ParseFailure
-from flowcli.parser import parse_source
-from flowcli.resolver import ProjectIndex
+from flowcli.analysis.classes import build_class_graph, scope_class_graph
+from flowcli.analysis.index import ProjectIndex
+from flowcli.analysis.model import ModuleInfo, ParseFailure
+from flowcli.analysis.parser import parse_source
 
 MEASUREMENT = (
     "from enum import StrEnum\n"

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from flowcli.tracer import SAMPLE_LIMIT, capture
+from flowcli.runtime.tracer import SAMPLE_LIMIT, capture
 
 FIXTURES = Path(__file__).parent / "fixtures"
 ROOT = FIXTURES / "traceproj"

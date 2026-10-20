@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flowcli.models import MODULE_QUALNAME, CallKind, ModuleInfo, ParseFailure
-from flowcli.parser import parse_module, parse_source
+from flowcli.analysis.model import MODULE_QUALNAME, CallKind, ModuleInfo, ParseFailure
+from flowcli.analysis.parser import parse_module, parse_source
 
 
 def parse(src: str, module: str = "m", *, is_package: bool = False) -> ModuleInfo:

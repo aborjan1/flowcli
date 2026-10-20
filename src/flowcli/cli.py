@@ -16,34 +16,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import runpy
 import sys
-import traceback
-from datetime import UTC, datetime
 from pathlib import Path
 
 from flowcli import __version__
-from flowcli.classes import ClassGraph, build_class_graph, scope_class_graph
-from flowcli.discovery import discover
-from flowcli.entrypoints import detect
-from flowcli.graph import (
-    Graph,
-    apply_runtime,
-    apply_simulation,
-    build_graph,
-    compute_depths,
-    parse_entry_specs,
-    prune_unreachable,
-    split_entry_spec,
-)
-from flowcli.models import ModuleInfo, ParseFailure
-from flowcli.parser import parse_module
-from flowcli.render_html import render_html
-from flowcli.report import print_summary, write_json, write_markdown
-from flowcli.resolver import ProjectIndex, resolve_all
-from flowcli.tracer import capture
+from flowcli.graph.entry import split_entry_spec
+from flowcli.output.report import print_summary
+from flowcli.pipeline import FORMATS, MapError, MapOptions, map_project, write_outputs
+from flowcli.runtime.runner import Program, execute, runtime_payload
 
-VALID_FORMATS = {"json", "md", "html"}
 SUBCOMMANDS = {"map", "run"}
 
 
@@ -125,146 +106,56 @@ def _entry_specs(raw: list[str], root: Path) -> list[str]:
 def _cmd_map(args: argparse.Namespace) -> int:
     root = Path(args.path)
     if not root.exists():
-        print(f"flowcli: error: path not found: {args.path}", file=sys.stderr)
-        return 1
-    entry_specs = _entry_specs(args.entry, root)
-
+        return _fail(f"path not found: {args.path}")
     formats = {f.strip() for f in args.formats.split(",") if f.strip()}
-    if not formats or formats - VALID_FORMATS:
-        print(
-            f"flowcli: error: unknown format(s): {', '.join(sorted(formats - VALID_FORMATS)) or '(none)'}",
-            file=sys.stderr,
-        )
-        return 1
+    if not formats or formats - FORMATS:
+        return _fail(f"unknown format(s): {', '.join(sorted(formats - FORMATS)) or '(none)'}")
 
-    files = discover(root, args.exclude)
-    if not files:
-        print(f"flowcli: no Python files found under {root}", file=sys.stderr)
-        return 2
-    modules, failures = _parse_all(files)
-    if not modules:
-        print("flowcli: no parseable Python files", file=sys.stderr)
-        return 2
-
-    index = ProjectIndex(modules)
-    resolved = resolve_all(index)
-    graph = build_graph(index, resolved, include_external=args.include_external)
-    called = {rc.target for rc in resolved if rc.status == "internal"}
-    suggestions = detect(index, called, root)
-
-    entry_label: str | None = None
-    entry_ids: list[str] = []
-    unreachable = 0
-    scoped = False
-    if entry_specs:
-        try:
-            entry_label, entry_ids = parse_entry_specs(entry_specs, index)
-        except ValueError as exc:
-            print(f"flowcli: error: {exc}", file=sys.stderr)
-            return 1
-        unreachable = compute_depths(graph, entry_ids, args.depth)
-        if not args.keep_unreachable:
-            prune_unreachable(graph)
-            scoped = True
-
-    sim_events: list[list[str]] = []
-    if not args.no_simulate:
-        sim_events = apply_simulation(graph, index, resolved, entry_ids or None)
-
-    class_graph = None
-    if not args.no_classes:
-        class_graph = build_class_graph(index)
-        if scoped:
-            class_graph = scope_class_graph(class_graph, {nid.split(":", 1)[0] for nid in graph.nodes})
-
-    runtime_data = None
-    if args.runtime:
-        try:
-            runtime_data = json.loads(Path(args.runtime).read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            print(f"flowcli: error: cannot read runtime file: {exc}", file=sys.stderr)
-            return 1
-
-    meta = _build_meta(graph, index, root, entry_label, unreachable, args.include_external, failures)
-    meta.update(
-        {
-            "scoped": scoped,
-            "depth_limit": args.depth,
-            "entry_nodes": entry_ids,
-            "simulated": not args.no_simulate,
-            "has_runtime": runtime_data is not None,
-            "entry_points": [s for s in suggestions if not scoped or s["id"] in graph.nodes],
-        }
+    entry_specs = _entry_specs(args.entry, root)
+    options = MapOptions(
+        root=root,
+        entries=entry_specs,
+        exclude=args.exclude,
+        depth=args.depth,
+        keep_unreachable=args.keep_unreachable,
+        include_external=args.include_external,
+        simulate=not args.no_simulate,
+        classes=not args.no_classes,
+        runtime_file=Path(args.runtime) if args.runtime else None,
     )
-    if runtime_data is not None:
-        meta["runtime_file"] = str(args.runtime)
-        meta["runtime_total"] = len(runtime_data.get("functions", {}))
-        meta["runtime_matched"] = apply_runtime(graph, runtime_data)
+    try:
+        result = map_project(options)
+    except MapError as exc:
+        # "nothing to map" is a plain notice, not a usage error
+        return _fail(str(exc), exc.exit_code, prefix="" if exc.exit_code == 2 else "error: ")
 
-    meta["class_count"] = len(class_graph.nodes) if class_graph else 0
-    _write_outputs(graph, meta, formats, Path(args.out_dir), runtime_data, sim_events, class_graph)
+    write_outputs(result, formats, Path(args.out_dir))
     if not args.quiet:
-        print_summary(graph, meta)
-        if not entry_specs and suggestions:
+        print_summary(result.graph, result.meta)
+        if not entry_specs and result.suggestions:
             print("suggested entry points (pass one as the second argument):")
-            for s in suggestions[:5]:
+            for s in result.suggestions[:5]:
                 print(f"  {s['id']:<48} {s['why']}")
         print(f"wrote {', '.join(sorted(formats))} to {args.out_dir}")
     return 0
 
 
-def _write_outputs(
-    graph: Graph,
-    meta: dict,
-    formats: set[str],
-    out_dir: Path,
-    runtime_data: dict | None,
-    sim_events: list[list[str]],
-    class_graph: ClassGraph | None = None,
-) -> None:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    if "json" in formats:
-        write_json(graph, meta, out_dir / "report.json", class_graph)
-    if "md" in formats:
-        write_markdown(graph, meta, out_dir / "report.md", class_graph)
-    if "html" in formats:
-        events = runtime_data if runtime_data else {"events": sim_events}
-        render_html(graph, meta, out_dir / "graph.html", runtime=events, class_graph=class_graph)
-
-
 def _cmd_run(args: argparse.Namespace) -> int:
-    prog = [p for p in args.prog if p != "--"] if args.prog and args.prog[0] == "--" else list(args.prog)
-    if not prog:
-        print("flowcli: error: no program given (script.py [args] or -- -m module [args])", file=sys.stderr)
-        return 1
-
-    if prog[0] == "-m":
-        if len(prog) < 2:
-            print("flowcli: error: -m requires a module name", file=sys.stderr)
-            return 1
-        mode, target, prog_args = "module", prog[1], prog[2:]
-        default_root = Path.cwd()
-    else:
-        mode, target, prog_args = "script", prog[0], prog[1:]
-        if not Path(target).is_file():
-            print(f"flowcli: error: script not found: {target}", file=sys.stderr)
-            return 1
-        default_root = Path(target).resolve().parent
-
-    root = Path(args.root).resolve() if args.root else default_root
+    try:
+        program = Program.parse(args.prog)
+    except ValueError as exc:
+        return _fail(str(exc))
+    root = Path(args.root).resolve() if args.root else program.home
     if not root.exists():
-        print(f"flowcli: error: root not found: {root}", file=sys.stderr)
-        return 1
+        return _fail(f"root not found: {root}")
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    cap, exit_code = _execute(mode, target, prog_args, root, default_root, samples=not args.no_samples)
+    samples = not args.no_samples
+    cap, exit_code = execute(program, root, samples=samples)
     runtime_path = out_dir / "runtime.json"
-    runtime_path.write_text(
-        json.dumps(_runtime_payload(cap, root, mode, target, prog_args, exit_code, not args.no_samples), indent=2)
-        + "\n",
-        encoding="utf-8",
-    )
+    payload = runtime_payload(cap, program, root, exit_code, samples)
+    runtime_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     if not args.quiet:
         print(f"flowcli: observed {len(cap.functions)} function(s), {cap.calls_total} call(s)")
         print(f"wrote runtime.json to {out_dir}")
@@ -279,92 +170,6 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return exit_code
 
 
-def _execute(mode: str, target: str, prog_args: list[str], root: Path, script_dir: Path, *, samples: bool):
-    exit_code = 0
-    old_argv = sys.argv[:]
-    added_path = str(script_dir if mode == "script" else Path.cwd())
-    sys.path.insert(0, added_path)
-    try:
-        with capture(root, samples=samples) as cap:
-            try:
-                sys.argv = [target, *prog_args]
-                if mode == "script":
-                    runpy.run_path(target, run_name="__main__")
-                else:
-                    runpy.run_module(target, run_name="__main__", alter_sys=True)
-            except SystemExit as exc:
-                exit_code = _exit_code_of(exc)
-            except BaseException:
-                traceback.print_exc()
-                exit_code = 1
-    finally:
-        sys.argv = old_argv
-        if added_path in sys.path:
-            sys.path.remove(added_path)
-    return cap, exit_code
-
-
-def _exit_code_of(exc: SystemExit) -> int:
-    code = exc.code
-    if code is None:
-        return 0
-    return code if isinstance(code, int) else 1
-
-
-def _runtime_payload(cap, root: Path, mode: str, target: str, prog_args: list[str], exit_code: int, samples: bool):
-    return {
-        "meta": {
-            "tool": "flowcli",
-            "version": __version__,
-            "schema_version": 1,
-            "root": str(root),
-            "argv": [target, *prog_args],
-            "mode": mode,
-            "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
-            "samples": samples,
-            "calls_total": cap.calls_total,
-            "events_truncated": cap.events_truncated,
-            "exit": exit_code,
-        },
-        "functions": cap.functions,
-        "events": cap.events,
-    }
-
-
-def _parse_all(files: list[tuple[str, Path]]) -> tuple[dict[str, ModuleInfo], list[ParseFailure]]:
-    modules: dict[str, ModuleInfo] = {}
-    failures: list[ParseFailure] = []
-    for mod_name, path in files:
-        result = parse_module(mod_name, path)
-        if isinstance(result, ParseFailure):
-            failures.append(result)
-            print(f"flowcli: warning: skipping {result.file}: {result.error}", file=sys.stderr)
-        else:
-            modules.setdefault(mod_name, result)  # duplicate module names: first (deterministic) wins
-    return modules, failures
-
-
-def _build_meta(
-    graph: Graph,
-    index: ProjectIndex,
-    root: Path,
-    entry_id: str | None,
-    unreachable: int,
-    include_external: bool,
-    failures: list[ParseFailure],
-) -> dict:
-    return {
-        "tool": "flowcli",
-        "version": __version__,
-        "schema_version": 1,
-        "root": str(root.resolve()),
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "module_count": len(index.modules),
-        "node_count": len(graph.nodes),
-        "edge_count": sum(len(n.calls) for n in graph.nodes.values()),
-        "entry": entry_id,
-        "unreachable_count": unreachable,
-        "include_external": include_external,
-        "skipped_files": [{"file": f.file, "error": f.error} for f in failures],
-        "unresolved_count": len(graph.unresolved),
-    }
+def _fail(message: str, code: int = 1, *, prefix: str = "error: ") -> int:
+    print(f"flowcli: {prefix}{message}", file=sys.stderr)
+    return code

@@ -12,8 +12,8 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from flowcli.models import MODULE_QUALNAME, ModuleInfo, node_id
-from flowcli.resolver import ProjectIndex
+from flowcli.analysis.index import ProjectIndex
+from flowcli.analysis.model import MODULE_QUALNAME, ModuleInfo, node_id
 
 MAIN_NAMES = ("main", "run", "cli", "execute", "serve", "start", "app")
 MAX_SUGGESTIONS = 12

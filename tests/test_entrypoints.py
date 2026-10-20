@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flowcli.discovery import discover, find_package_prefix
-from flowcli.entrypoints import detect
-from flowcli.models import ModuleInfo, ParseFailure
-from flowcli.parser import parse_module
-from flowcli.resolver import ProjectIndex, resolve_all
+from flowcli.analysis.discovery import discover, find_package_prefix
+from flowcli.analysis.entrypoints import detect
+from flowcli.analysis.index import ProjectIndex
+from flowcli.analysis.model import ModuleInfo, ParseFailure
+from flowcli.analysis.parser import parse_module
+from flowcli.analysis.resolver import resolve_all
 
 
 def index_of(root: Path) -> ProjectIndex:

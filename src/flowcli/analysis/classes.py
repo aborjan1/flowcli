@@ -11,8 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from flowcli.models import ClassInfo, ModuleInfo
-from flowcli.resolver import ProjectIndex, _resolve_class_ref
+from flowcli.analysis.index import ClassRef, ProjectIndex
+from flowcli.analysis.model import ClassInfo, ModuleInfo, node_id
 
 ENUM_BASES = frozenset({"Enum", "IntEnum", "StrEnum", "Flag", "IntFlag", "ReprEnum"})
 DATACLASS_DECORATORS = frozenset({"dataclass", "attrs", "define", "frozen"})
@@ -49,17 +49,13 @@ class ClassGraph:
     edges: list[ClassEdge] = field(default_factory=list)
 
 
-def class_id(module: str, qualname: str) -> str:
-    return f"{module}:{qualname}"
-
-
 def build_class_graph(index: ProjectIndex) -> ClassGraph:
     graph = ClassGraph()
     for mod_name in sorted(index.modules):
         mod = index.modules[mod_name]
         for qualname in sorted(mod.classes):
             ci = mod.classes[qualname]
-            graph.nodes[class_id(mod_name, qualname)] = _make_node(index, mod, ci)
+            graph.nodes[node_id(mod_name, qualname)] = _make_node(index, mod, ci)
 
     for nid in sorted(graph.nodes):
         node = graph.nodes[nid]
@@ -73,7 +69,7 @@ def build_class_graph(index: ProjectIndex) -> ClassGraph:
 
 def _make_node(index: ProjectIndex, mod: ModuleInfo, ci: ClassInfo) -> ClassNode:
     node = ClassNode(
-        id=class_id(mod.name, ci.qualname),
+        id=node_id(mod.name, ci.qualname),
         module=mod.name,
         name=ci.qualname,
         file=mod.file,
@@ -82,17 +78,12 @@ def _make_node(index: ProjectIndex, mod: ModuleInfo, ci: ClassInfo) -> ClassNode
         bases=list(ci.base_reprs),
     )
     for parts in ci.bases:  # resolvable bases, in declaration order
-        found = _resolve_class_ref(index, mod, parts)
-        node.base_refs.append(class_id(found[0], found[1]) if found is not None else None)
+        node.base_refs.append(_ref_id(index.find_class(mod, parts)))
     while len(node.base_refs) < len(node.bases):
         node.base_refs.append(None)  # dynamic bases (namedtuple(...)) have a display but no parts
     for f in ci.fields:
-        ref = None
         parts = tuple(f.get("parts") or ())
-        if parts:
-            found = _resolve_class_ref(index, mod, parts)
-            if found is not None:
-                ref = class_id(found[0], found[1])
+        ref = _ref_id(index.find_class(mod, parts)) if parts else None
         node.fields.append(
             {
                 "name": f["name"],
@@ -104,8 +95,12 @@ def _make_node(index: ProjectIndex, mod: ModuleInfo, ci: ClassInfo) -> ClassNode
     for name in sorted(ci.methods):
         qual = ci.methods[name]
         if not name.startswith("_") or name == "__init__":
-            node.methods.append({"name": name, "id": f"{mod.name}:{qual}"})
+            node.methods.append({"name": name, "id": node_id(mod.name, qual)})
     return node
+
+
+def _ref_id(ref: ClassRef | None) -> str | None:
+    return node_id(*ref) if ref is not None else None
 
 
 def _stereotype(ci: ClassInfo) -> str:
@@ -125,11 +120,9 @@ def _stereotype(ci: ClassInfo) -> str:
 
 def _add_inheritance(index: ProjectIndex, mod: ModuleInfo, ci: ClassInfo, nid: str, graph: ClassGraph) -> None:
     for parts in ci.bases:
-        found = _resolve_class_ref(index, mod, parts)
-        if found is not None:
-            target = class_id(found[0], found[1])
-            if target in graph.nodes and target != nid:
-                graph.edges.append(ClassEdge(source=nid, target=target, kind="inherits"))
+        target = _ref_id(index.find_class(mod, parts))
+        if target is not None and target in graph.nodes and target != nid:
+            graph.edges.append(ClassEdge(source=nid, target=target, kind="inherits"))
 
 
 def _add_composition(node: ClassNode, nid: str, graph: ClassGraph) -> None:
