@@ -15,8 +15,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from flowcli.models import MODULE_QUALNAME, CallKind, FunctionInfo, ModuleInfo, node_id
-from flowcli.resolver import INTERNAL, ProjectIndex, ResolvedCall, _resolve_class_ref, _resolve_one as resolve_one
+from flowcli.analysis.index import ProjectIndex
+from flowcli.analysis.model import MODULE_QUALNAME, CallKind, FunctionInfo, ModuleInfo, node_id
+from flowcli.analysis.resolver import INTERNAL, ResolvedCall, resolve_parts
 
 MAX_PASSES = 3
 MAX_VALUES = 4  # distinct literal values kept per parameter
@@ -179,8 +180,7 @@ def _eval_atom(
     if kind == "name":
         local = caller.local_types.get(payload)
         if local:
-            ref = _resolve_class_ref(index, mod, local)
-            return ([ref[1] if ref else ".".join(local)], None)
+            return ([index.type_display(mod, local)], None)
         known = records.get(caller_id, {}).get("args", {}).get(payload)
         if known:  # forwarding one of the caller's own parameters
             return (list(known["types"]), known["values"][0] if known["values"] else None)
@@ -190,8 +190,7 @@ def _eval_atom(
             ci = mod.classes.get(caller.class_qualname)
             parts = ci.attr_types.get(payload) if ci else None
             if parts:
-                ref = _resolve_class_ref(index, mod, parts)
-                return ([ref[1] if ref else ".".join(parts)], None)
+                return ([index.type_display(mod, parts)], None)
         return ([], None)
     if kind == "call":
         return (_returns_of_call(index, mod, caller, signatures, tuple(payload)), None)
@@ -205,12 +204,10 @@ def _returns_of_call(
     signatures: dict[str, dict[str, Any]],
     parts: tuple[str, ...],
 ) -> list[str]:
-    ref = _resolve_class_ref(index, mod, parts)
+    ref = index.find_class(mod, parts)
     if ref is not None:
         return [ref[1]]  # constructor call -> an instance of that class
-    from flowcli.infer import _raw_call_for  # local import: infer imports models only
-
-    status, target, _ = resolve_one(index, mod, caller, _raw_call_for(parts, caller))
+    status, target, _ = resolve_parts(index, mod, caller, parts)
     if status != INTERNAL:
         return []
     return list(signatures.get(target, {}).get("returns", []))[:MAX_TYPES]

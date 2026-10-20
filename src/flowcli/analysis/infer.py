@@ -11,13 +11,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from flowcli.models import MODULE_QUALNAME, CallKind, FunctionInfo, ModuleInfo, RawCall, node_id
-from flowcli.resolver import (
-    INTERNAL,
-    ProjectIndex,
-    _resolve_class_ref,
-    _resolve_one,
-)
+from flowcli.analysis.index import ProjectIndex
+from flowcli.analysis.model import MODULE_QUALNAME, FunctionInfo, ModuleInfo, node_id, split_node_id
+from flowcli.analysis.resolver import INTERNAL, resolve_parts
 
 MAX_PASSES = 3
 MAX_RETURN_TYPES = 5
@@ -101,8 +97,7 @@ def _resolve_return_expr(
         parts = fn.local_types.get(value)
         if not parts:
             return (None, None)
-        ref = _resolve_class_ref(index, mod, parts)
-        return (ref[1] if ref is not None else ".".join(parts), None)
+        return (index.type_display(mod, parts), None)
     if tag == "call":
         return _resolve_return_call(index, mod, fn, tuple(value))
     return (None, None)  # "unknown": marks that a return exists, contributes no type
@@ -113,25 +108,13 @@ def _resolve_return_call(
 ) -> tuple[str | None, str | None]:
     if parts == ("cls",) and fn.class_qualname:
         return (fn.class_qualname, None)
-    ref = _resolve_class_ref(index, mod, parts)
+    ref = index.find_class(mod, parts)
     if ref is not None:  # constructor call -> instance of that class
         return (ref[1], None)
-    status, target, _reason = _resolve_one(index, mod, fn, _raw_call_for(parts, fn))
+    status, target, _reason = resolve_parts(index, mod, fn, parts)
     if status != INTERNAL:
         return (None, None)
-    if target.rpartition(":")[2].endswith("__init__"):  # constructor reached via alias/import
-        cls = target.split(":", 1)[1].rsplit(".__init__", 1)[0]
-        return (cls, None)
+    qualname = split_node_id(target)[1]
+    if qualname.endswith("__init__"):  # constructor reached via alias/import
+        return (qualname.rsplit(".__init__", 1)[0], None)
     return (None, target)  # depend on the callee's inferred return type
-
-
-def _raw_call_for(parts: tuple[str, ...], fn: FunctionInfo) -> RawCall:
-    hint = ".".join(parts)
-    if len(parts) == 1:
-        return RawCall(CallKind.NAME, parts, 0, hint)
-    if parts[0] in ("self", "cls") and fn.class_qualname:
-        if len(parts) == 2:
-            kind = CallKind.SELF_ATTR if parts[0] == "self" else CallKind.CLS_ATTR
-            return RawCall(kind, parts, 0, hint)
-        return RawCall(CallKind.OPAQUE, parts, 0, hint)  # self.attr.method() chain
-    return RawCall(CallKind.DOTTED, parts, 0, hint)

@@ -8,9 +8,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from flowcli.infer import infer_signatures
-from flowcli.models import MODULE_QUALNAME, ModuleInfo, Node, UnresolvedCall, node_id
-from flowcli.resolver import EXTERNAL, INTERNAL, ProjectIndex, ResolvedCall
+from flowcli.analysis.index import ProjectIndex
+from flowcli.analysis.infer import infer_signatures
+from flowcli.analysis.model import MODULE_QUALNAME, ModuleInfo, Node, UnresolvedCall, node_id
+from flowcli.analysis.resolver import EXTERNAL, INTERNAL, ResolvedCall
+from flowcli.analysis.simulate import module_entry_candidates, simulate
 
 
 @dataclass
@@ -31,8 +33,6 @@ def apply_simulation(
     graph: Graph, index: ProjectIndex, resolved: list[ResolvedCall], entry_ids: list[str] | None = None
 ) -> list[list[str]]:
     """Run the static simulation and attach it to nodes. Returns the simulated call order."""
-    from flowcli.simulate import module_entry_candidates, simulate
-
     signatures = {nid: node.signature for nid, node in graph.nodes.items() if node.signature}
     seeds = entry_ids or [nid for nid in module_entry_candidates(index) if nid in graph.nodes]
     records, events = simulate(index, resolved, signatures, seeds)

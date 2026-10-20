@@ -23,9 +23,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from flowcli import __version__
-from flowcli.classes import ClassGraph, build_class_graph, scope_class_graph
-from flowcli.discovery import discover
-from flowcli.entrypoints import detect
+from flowcli.analysis.classes import ClassGraph, build_class_graph, scope_class_graph
+from flowcli.analysis.discovery import discover
+from flowcli.analysis.entrypoints import detect
+from flowcli.analysis.index import ProjectIndex
+from flowcli.analysis.model import ModuleInfo, ParseFailure
+from flowcli.analysis.parser import parse_module
+from flowcli.analysis.resolver import resolve_all
 from flowcli.graph import (
     Graph,
     apply_runtime,
@@ -36,11 +40,8 @@ from flowcli.graph import (
     prune_unreachable,
     split_entry_spec,
 )
-from flowcli.models import ModuleInfo, ParseFailure
-from flowcli.parser import parse_module
 from flowcli.render_html import render_html
 from flowcli.report import print_summary, write_json, write_markdown
-from flowcli.resolver import ProjectIndex, resolve_all
 from flowcli.tracer import capture
 
 VALID_FORMATS = {"json", "md", "html"}

@@ -24,8 +24,8 @@ from pathlib import Path
 from types import CodeType, FrameType
 from typing import Any
 
-from flowcli.discovery import SKIP_DIRS, derive_module_name, find_package_prefix
-from flowcli.models import MODULE_QUALNAME, node_id
+from flowcli.analysis.discovery import SKIP_DIRS, derive_module_name, find_package_prefix
+from flowcli.analysis.model import MODULE_QUALNAME, node_id
 
 SAMPLE_LIMIT = 5  # repr samples kept per function
 TYPE_LIMIT = 8  # distinct observed types kept per param / return

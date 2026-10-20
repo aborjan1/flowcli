@@ -111,3 +111,9 @@ class Node:
 
 def node_id(module: str, qualname: str) -> str:
     return f"{module}:{qualname}"
+
+
+def split_node_id(nid: str) -> tuple[str, str]:
+    """Inverse of node_id: ("pkg.mod", "Class.method"). External ids have no qualname: ("os.path.join", "")."""
+    module, _, qualname = nid.partition(":")
+    return module, qualname

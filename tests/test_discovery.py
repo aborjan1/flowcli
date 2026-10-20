@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flowcli.discovery import discover, find_package_prefix
+from flowcli.analysis.discovery import discover, find_package_prefix
 
 
 def names(entries: list[tuple[str, Path]]) -> list[str]:

@@ -7,7 +7,9 @@ import tokenize
 from pathlib import Path
 from typing import Any
 
-from flowcli.models import (
+from flowcli.analysis.astutil import dotted_parts, safe_unparse
+from flowcli.analysis.flow import flow_of
+from flowcli.analysis.model import (
     MODULE_QUALNAME,
     ArgAtom,
     CallKind,
@@ -36,13 +38,6 @@ def parse_source(module_name: str, file: str, source: str, *, is_package: bool =
     info = ModuleInfo(name=module_name, file=file, is_package=is_package)
     _Collector(info).visit(tree)
     return info
-
-
-def _safe_unparse(node: ast.AST, limit: int = 80) -> str:
-    try:
-        return ast.unparse(node)[:limit]
-    except Exception:
-        return "<expr>"
 
 
 class _Collector(ast.NodeVisitor):
@@ -92,7 +87,7 @@ class _Collector(ast.NodeVisitor):
             return RawCall(CallKind.NAME, (expr.id,), lineno, expr.id)
         if isinstance(expr, ast.Attribute):
             return self._classify_attribute(expr, lineno)
-        return RawCall(CallKind.OPAQUE, (), lineno, _safe_unparse(expr))
+        return RawCall(CallKind.OPAQUE, (), lineno, safe_unparse(expr))
 
     def _classify_attribute(self, expr: ast.Attribute, lineno: int) -> RawCall:
         attrs: list[str] = []
@@ -114,14 +109,14 @@ class _Collector(ast.NodeVisitor):
         is_super = isinstance(cur, ast.Call) and isinstance(cur.func, ast.Name) and cur.func.id == "super"
         if is_super and len(attrs) == 1 and in_class:
             return RawCall(CallKind.SUPER_ATTR, ("super", attrs[0]), lineno, f"super().{attrs[0]}")
-        return RawCall(CallKind.OPAQUE, tuple(attrs), lineno, _safe_unparse(expr))
+        return RawCall(CallKind.OPAQUE, tuple(attrs), lineno, safe_unparse(expr))
 
     def _visit_decorators(self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> list[str]:
         """Record decorator applications as calls in the *enclosing* sink (they execute there)."""
         names: list[str] = []
         for dec in node.decorator_list:
             target = dec.func if isinstance(dec, ast.Call) else dec
-            names.append(_safe_unparse(target))
+            names.append(safe_unparse(target))
             if isinstance(dec, ast.Call):
                 self.visit(dec)  # records the call and walks its args
             else:
@@ -159,10 +154,10 @@ class _Collector(ast.NodeVisitor):
                 owner.methods[node.name] = qualname  # redefinition: the last def is what exists at runtime
 
         fn.decorators = self._visit_decorators(node)
-        fn.flow = _flow_of_body(node.body, [_MAX_FLOW_NODES])
+        fn.flow = flow_of(node.body)
         fn.params = _param_list(node.args)
         if node.returns is not None:
-            fn.returns_ann = _safe_unparse(node.returns, 60)
+            fn.returns_ann = safe_unparse(node.returns, 60)
             fn.returns_ann_parts = _annotation_parts(node.returns)
         for arg in [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]:
             if arg.annotation is not None:
@@ -189,8 +184,8 @@ class _Collector(ast.NodeVisitor):
 
         for base in node.bases:
             target = base.value if isinstance(base, ast.Subscript) else base  # unwrap Generic[T]-style bases
-            parts = _dotted_parts(target)
-            ci.base_reprs.append(_safe_unparse(base, 40))
+            parts = dotted_parts(target)
+            ci.base_reprs.append(safe_unparse(base, 40))
             if parts:
                 ci.bases.append(parts)
             else:
@@ -282,7 +277,7 @@ class _Collector(ast.NodeVisitor):
     def visit_Assign(self, node: ast.Assign) -> None:
         if len(node.targets) == 1:
             target = node.targets[0]
-            parts = _dotted_parts(node.value.func) if isinstance(node.value, ast.Call) else ()
+            parts = dotted_parts(node.value.func) if isinstance(node.value, ast.Call) else ()
             in_class_body = self._sink is None and self._stack and self._stack[-1][0] == "class"
             if parts and isinstance(target, ast.Name) and self._sink is not None:
                 self._sink.local_types[target.id] = parts  # x = Engine() -> x behaves as Engine
@@ -290,7 +285,7 @@ class _Collector(ast.NodeVisitor):
                 ci = self.info.classes.get(self._stack[-1][1])
                 if ci is not None:  # class-level constant, or an enum member
                     self._record_field(
-                        ci, target.id, parts=parts, value=_safe_unparse(node.value, 30), lineno=node.lineno
+                        ci, target.id, parts=parts, value=safe_unparse(node.value, 30), lineno=node.lineno
                     )
                 if parts:
                     self._record_self_attr(target.id, parts, lineno=node.lineno, source="class")
@@ -301,7 +296,7 @@ class _Collector(ast.NodeVisitor):
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         parts = _annotation_parts(node.annotation)
-        ann = _safe_unparse(node.annotation, 40)
+        ann = safe_unparse(node.annotation, 40)
         if isinstance(node.target, ast.Name):
             if self._sink is not None:
                 if parts:
@@ -348,122 +343,6 @@ class _Collector(ast.NodeVisitor):
         self.generic_visit(node)  # nested calls in args (and in the func expr itself) still count
 
 
-# -- control-flow extraction ------------------------------------------------
-#
-# Each function gets a nested, JSON-able flow tree used for the deterministic
-# flowchart view. Node shapes:
-#   {"t": "stmt"|"ret", "label", "line", "end"}
-#   {"t": "if",     "label", "line", "head_end", "then": [...], "else": [...]}
-#   {"t": "loop",   "label", "line", "head_end", "body": [...]}
-#   {"t": "with",   "label", "line", "head_end", "body": [...]}
-#   {"t": "try",    "label", "line", "head_end", "body": [...],
-#                   "handlers": [{"label", "body": [...]}], "final": [...]}
-#   {"t": "switch", "label", "line", "head_end", "cases": [{"label", "body": [...]}]}
-# The resolver's per-line call targets are attached later (graph.build_graph)
-# as a "calls" list on stmt/ret/head nodes.
-
-_MAX_FLOW_NODES = 200
-_LABEL_LIMIT = 64
-
-
-def _short(text: str) -> str:
-    flat = " ".join(text.split())
-    return flat if len(flat) <= _LABEL_LIMIT else flat[: _LABEL_LIMIT - 1] + "…"
-
-
-def _flow_of_body(body: list[ast.stmt], budget: list[int]) -> list[dict]:
-    out: list[dict] = []
-    for stmt in body:
-        if budget[0] <= 0:
-            out.append({"t": "stmt", "label": "…", "line": stmt.lineno, "end": stmt.lineno})
-            break
-        budget[0] -= 1
-        out.append(_flow_of_stmt(stmt, budget))
-    return out
-
-
-def _flow_of_stmt(stmt: ast.stmt, budget: list[int]) -> dict:  # noqa: C901
-    line = stmt.lineno
-    if isinstance(stmt, ast.If):
-        return {
-            "t": "if",
-            "label": "if " + _short(_safe_unparse(stmt.test, _LABEL_LIMIT)),
-            "line": line,
-            "head_end": stmt.test.end_lineno or line,
-            "then": _flow_of_body(stmt.body, budget),
-            "else": _flow_of_body(stmt.orelse, budget),
-        }
-    if isinstance(stmt, ast.For | ast.AsyncFor):
-        label = "for " + _short(f"{_safe_unparse(stmt.target)} in {_safe_unparse(stmt.iter)}")
-        return {
-            "t": "loop",
-            "label": label,
-            "line": line,
-            "head_end": stmt.iter.end_lineno or line,
-            "body": _flow_of_body(stmt.body, budget),
-        }
-    if isinstance(stmt, ast.While):
-        return {
-            "t": "loop",
-            "label": "while " + _short(_safe_unparse(stmt.test, _LABEL_LIMIT)),
-            "line": line,
-            "head_end": stmt.test.end_lineno or line,
-            "body": _flow_of_body(stmt.body, budget),
-        }
-    if isinstance(stmt, ast.With | ast.AsyncWith):
-        items = ", ".join(_safe_unparse(it, 40) for it in stmt.items)
-        return {
-            "t": "with",
-            "label": _short(f"with {items}"),
-            "line": line,
-            "head_end": stmt.items[-1].context_expr.end_lineno or line,
-            "body": _flow_of_body(stmt.body, budget),
-        }
-    if isinstance(stmt, ast.Try | ast.TryStar):
-        return _flow_of_try(stmt, budget)
-    if isinstance(stmt, ast.Match):
-        return {
-            "t": "switch",
-            "label": "match " + _short(_safe_unparse(stmt.subject, 40)),
-            "line": line,
-            "head_end": stmt.subject.end_lineno or line,
-            "cases": [
-                {"label": "case " + _short(_safe_unparse(c.pattern, 40)), "body": _flow_of_body(c.body, budget)}
-                for c in stmt.cases
-            ],
-        }
-    if isinstance(stmt, ast.Return | ast.Raise):
-        return {"t": "ret", "label": _short(_safe_unparse(stmt, _LABEL_LIMIT)), "line": line, "end": _end(stmt)}
-    if isinstance(stmt, ast.FunctionDef | ast.AsyncFunctionDef):
-        return {"t": "stmt", "label": f"def {stmt.name}(…)", "line": line, "end": line}
-    if isinstance(stmt, ast.ClassDef):
-        return {"t": "stmt", "label": f"class {stmt.name}", "line": line, "end": line}
-    return {"t": "stmt", "label": _short(_safe_unparse(stmt, _LABEL_LIMIT)), "line": line, "end": _end(stmt)}
-
-
-def _flow_of_try(stmt: ast.Try | ast.TryStar, budget: list[int]) -> dict:
-    handlers = [
-        {
-            "label": "except" + (f" {_short(_safe_unparse(h.type, 40))}" if h.type else ""),
-            "body": _flow_of_body(h.body, budget),
-        }
-        for h in stmt.handlers
-    ]
-    return {
-        "t": "try",
-        "label": "try",
-        "line": stmt.lineno,
-        "head_end": stmt.lineno,
-        "body": _flow_of_body(stmt.body + stmt.orelse, budget),
-        "handlers": handlers,
-        "final": _flow_of_body(stmt.finalbody, budget),
-    }
-
-
-def _end(stmt: ast.stmt) -> int:
-    return stmt.end_lineno or stmt.lineno
-
-
 def _is_main_guard(test: ast.expr) -> bool:
     """`__name__ == "__main__"` in either order."""
     if not isinstance(test, ast.Compare) or len(test.ops) != 1 or not isinstance(test.ops[0], ast.Eq):
@@ -480,8 +359,8 @@ def _param_list(args: ast.arguments) -> list[dict[str, str | None]]:
     def entry(arg: ast.arg, default: ast.expr | None, prefix: str = "") -> dict[str, str | None]:
         return {
             "name": prefix + arg.arg,
-            "ann": _safe_unparse(arg.annotation, 40) if arg.annotation is not None else None,
-            "default": _safe_unparse(default, 30) if default is not None else None,
+            "ann": safe_unparse(arg.annotation, 40) if arg.annotation is not None else None,
+            "default": safe_unparse(default, 30) if default is not None else None,
         }
 
     out: list[dict[str, str | None]] = []
@@ -528,12 +407,12 @@ def _literal_arg(value: ast.expr) -> tuple[str, Any] | None:
             if isinstance(value.value, pytype):
                 tname = name
                 break
-        return ("lit", (_safe_unparse(value, 30), tname or "object"))
+        return ("lit", (safe_unparse(value, 30), tname or "object"))
     if isinstance(value, ast.JoinedStr):
-        return ("lit", (_safe_unparse(value, 30), "str"))
+        return ("lit", (safe_unparse(value, 30), "str"))
     for node_type, tname in _ARG_LITERALS:
         if isinstance(value, node_type):
-            return ("lit", (_safe_unparse(value, 30), tname))
+            return ("lit", (safe_unparse(value, 30), tname))
     return None
 
 
@@ -546,10 +425,10 @@ def _classify_arg_expr(value: ast.expr) -> tuple[str, Any]:
     if isinstance(value, ast.Name):
         return ("name", value.id)
     if isinstance(value, ast.Call):
-        parts = _dotted_parts(value.func)
+        parts = dotted_parts(value.func)
         return ("call", parts) if parts else ("unknown", "")
     if isinstance(value, ast.Attribute):
-        parts = _dotted_parts(value)
+        parts = dotted_parts(value)
         if parts and parts[0] == "self" and len(parts) == 2:
             return ("selfattr", parts[1])
     return ("unknown", "")
@@ -577,7 +456,7 @@ def _classify_return_expr(value: ast.expr | None) -> tuple[str, Any]:
     if isinstance(value, ast.Tuple):
         return ("const", "tuple")
     if isinstance(value, ast.Call):
-        parts = _dotted_parts(value.func)
+        parts = dotted_parts(value.func)
         return ("call", parts) if parts else ("unknown", "")
     if isinstance(value, ast.Name):
         return ("name", value.id)
@@ -588,7 +467,7 @@ def _is_overload_stub(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     """True for @overload / @typing.overload-decorated defs — type declarations, not runtime code."""
     for dec in node.decorator_list:
         target = dec.func if isinstance(dec, ast.Call) else dec
-        parts = _dotted_parts(target)
+        parts = dotted_parts(target)
         if parts and parts[-1] == "overload":
             return True
     return False
@@ -609,21 +488,8 @@ def _annotation_parts(node: ast.expr) -> tuple[str, ...]:
         left = _annotation_parts(node.left)
         return left or _annotation_parts(node.right)
     if isinstance(node, ast.Subscript):
-        base = _dotted_parts(node.value)
+        base = dotted_parts(node.value)
         if base and base[-1] == "Optional":
             return _annotation_parts(node.slice)
         return base
-    return _dotted_parts(node)
-
-
-def _dotted_parts(node: ast.expr) -> tuple[str, ...]:
-    """Flatten a Name/Attribute chain to its dotted parts; () if not a plain chain."""
-    attrs: list[str] = []
-    cur = node
-    while isinstance(cur, ast.Attribute):
-        attrs.append(cur.attr)
-        cur = cur.value
-    if isinstance(cur, ast.Name):
-        attrs.append(cur.id)
-        return tuple(reversed(attrs))
-    return ()
+    return dotted_parts(node)

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from flowcli.analysis.index import ProjectIndex
+from flowcli.analysis.model import ModuleInfo, ParseFailure
+from flowcli.analysis.parser import parse_source
+from flowcli.analysis.resolver import resolve_all
 from flowcli.graph import Graph, apply_simulation, build_graph
-from flowcli.models import ModuleInfo, ParseFailure
-from flowcli.parser import parse_source
-from flowcli.resolver import ProjectIndex, resolve_all
 
 
 def build(src: str, name: str = "m") -> tuple[Graph, ProjectIndex, list]:

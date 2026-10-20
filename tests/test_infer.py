@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from flowcli.analysis.index import ProjectIndex
+from flowcli.analysis.infer import infer_signatures
+from flowcli.analysis.model import ModuleInfo, ParseFailure
+from flowcli.analysis.parser import parse_source
 from flowcli.graph import Graph
-from flowcli.infer import infer_signatures
-from flowcli.models import ModuleInfo, ParseFailure
-from flowcli.parser import parse_source
-from flowcli.resolver import ProjectIndex
 
 
 def build(*sources: tuple[str, str]) -> ProjectIndex:

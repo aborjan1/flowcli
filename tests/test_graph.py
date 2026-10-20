@@ -4,6 +4,10 @@ from pathlib import Path
 
 import pytest
 
+from flowcli.analysis.index import ProjectIndex
+from flowcli.analysis.model import ModuleInfo, ParseFailure
+from flowcli.analysis.parser import parse_source
+from flowcli.analysis.resolver import resolve_all
 from flowcli.graph import (
     Graph,
     build_graph,
@@ -13,9 +17,6 @@ from flowcli.graph import (
     prune_unreachable,
     split_entry_spec,
 )
-from flowcli.models import ModuleInfo, ParseFailure
-from flowcli.parser import parse_source
-from flowcli.resolver import ProjectIndex, resolve_all
 
 
 def test_called_by_inverse(sample_graph: Graph) -> None:

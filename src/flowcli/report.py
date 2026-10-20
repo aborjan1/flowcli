@@ -9,9 +9,9 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from flowcli.classes import ClassGraph
+from flowcli.analysis.classes import ClassGraph
+from flowcli.analysis.model import Node
 from flowcli.graph import Graph
-from flowcli.models import Node
 
 
 def write_json(graph: Graph, meta: dict[str, Any], out: Path, class_graph: ClassGraph | None = None) -> None:
