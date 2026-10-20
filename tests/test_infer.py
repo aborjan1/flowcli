@@ -4,7 +4,7 @@ from flowcli.analysis.index import ProjectIndex
 from flowcli.analysis.infer import infer_signatures
 from flowcli.analysis.model import ModuleInfo, ParseFailure
 from flowcli.analysis.parser import parse_source
-from flowcli.graph import Graph
+from flowcli.graph.model import Graph
 
 
 def build(*sources: tuple[str, str]) -> ProjectIndex:

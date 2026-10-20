@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from flowcli.graph import Graph, compute_depths
+from flowcli.graph.model import Graph
+from flowcli.graph.scope import compute_depths
 from flowcli.report import write_json, write_markdown
 
 

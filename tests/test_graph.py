@@ -8,15 +8,10 @@ from flowcli.analysis.index import ProjectIndex
 from flowcli.analysis.model import ModuleInfo, ParseFailure
 from flowcli.analysis.parser import parse_source
 from flowcli.analysis.resolver import resolve_all
-from flowcli.graph import (
-    Graph,
-    build_graph,
-    compute_depths,
-    parse_entry_spec,
-    parse_entry_specs,
-    prune_unreachable,
-    split_entry_spec,
-)
+from flowcli.graph.build import build_graph
+from flowcli.graph.entry import parse_entry_spec, parse_entry_specs, split_entry_spec
+from flowcli.graph.model import Graph
+from flowcli.graph.scope import compute_depths, prune_unreachable
 
 
 def test_called_by_inverse(sample_graph: Graph) -> None:

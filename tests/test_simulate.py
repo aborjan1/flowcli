@@ -6,7 +6,8 @@ from flowcli.analysis.index import ProjectIndex
 from flowcli.analysis.model import ModuleInfo, ParseFailure
 from flowcli.analysis.parser import parse_source
 from flowcli.analysis.resolver import resolve_all
-from flowcli.graph import Graph, apply_simulation, build_graph
+from flowcli.graph.build import apply_simulation, build_graph
+from flowcli.graph.model import Graph
 
 
 def build(src: str, name: str = "m") -> tuple[Graph, ProjectIndex, list]:

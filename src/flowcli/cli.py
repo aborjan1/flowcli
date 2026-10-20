@@ -30,16 +30,10 @@ from flowcli.analysis.index import ProjectIndex
 from flowcli.analysis.model import ModuleInfo, ParseFailure
 from flowcli.analysis.parser import parse_module
 from flowcli.analysis.resolver import resolve_all
-from flowcli.graph import (
-    Graph,
-    apply_runtime,
-    apply_simulation,
-    build_graph,
-    compute_depths,
-    parse_entry_specs,
-    prune_unreachable,
-    split_entry_spec,
-)
+from flowcli.graph.build import apply_runtime, apply_simulation, build_graph
+from flowcli.graph.entry import parse_entry_specs, split_entry_spec
+from flowcli.graph.model import Graph
+from flowcli.graph.scope import compute_depths, prune_unreachable
 from flowcli.render_html import render_html
 from flowcli.report import print_summary, write_json, write_markdown
 from flowcli.tracer import capture

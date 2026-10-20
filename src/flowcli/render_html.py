@@ -8,8 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from flowcli.analysis.classes import ClassGraph
-from flowcli.analysis.model import Node
-from flowcli.graph import Graph
+from flowcli.graph.model import Graph, Node
 from flowcli.template_html import TEMPLATE
 
 EXTERNAL_MODULE = "(external)"

@@ -9,7 +9,8 @@ from flowcli.analysis.index import ProjectIndex
 from flowcli.analysis.model import ModuleInfo, ParseFailure
 from flowcli.analysis.parser import parse_module
 from flowcli.analysis.resolver import resolve_all
-from flowcli.graph import Graph, build_graph
+from flowcli.graph.build import build_graph
+from flowcli.graph.model import Graph
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
